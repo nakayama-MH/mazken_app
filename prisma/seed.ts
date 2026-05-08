@@ -4,6 +4,13 @@ import { hashSync } from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
+  // 冪等性ガード: 既にデータがある DB では何もしない（再実行安全）
+  const existingCount = await prisma.branchOffice.count();
+  if (existingCount > 0) {
+    console.log(`Seed skipped: branch_offices already has ${existingCount} rows.`);
+    return;
+  }
+
   // ===== 営業所 =====
   const branches = await Promise.all([
     prisma.branchOffice.create({
