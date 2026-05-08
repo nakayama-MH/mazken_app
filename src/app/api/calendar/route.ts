@@ -90,19 +90,18 @@ export async function GET(request: NextRequest) {
   });
 
   // Headcount by site per day
-  const headcountBySite = await prisma.$queryRawUnsafe<
-    { date: string; jobSiteId: number; siteName: string; count: number }[]
-  >(
-    `SELECT ad.date, a."jobSiteId" as jobSiteId, js.name as siteName, COUNT(*) as count
-     FROM assignment_days ad
-     JOIN assignments a ON ad."assignmentId" = a.id
-     JOIN job_sites js ON a."jobSiteId" = js.id
-     WHERE ad.date >= ? AND ad.date <= ? AND ad.status = 'scheduled'
-     GROUP BY ad.date, a."jobSiteId"
-     ORDER BY ad.date, count DESC`,
-    startDate,
-    endDate
-  );
+  // PostgreSQL: パラメータバインドはテンプレートリテラル、GROUP BY に集約しない列を全て含める
+  const headcountBySite = await prisma.$queryRaw<
+    { date: string; jobSiteId: number; siteName: string; count: bigint }[]
+  >`
+    SELECT ad.date, a."jobSiteId" as "jobSiteId", js.name as "siteName", COUNT(*) as count
+    FROM assignment_days ad
+    JOIN assignments a ON ad."assignmentId" = a.id
+    JOIN job_sites js ON a."jobSiteId" = js.id
+    WHERE ad.date >= ${startDate} AND ad.date <= ${endDate} AND ad.status = 'scheduled'
+    GROUP BY ad.date, a."jobSiteId", js.name
+    ORDER BY ad.date, count DESC
+  `;
 
   return NextResponse.json({
     staff,
